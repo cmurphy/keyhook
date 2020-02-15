@@ -195,27 +195,35 @@ replicas. With a resource limit of 10 for the entire tree, consuming 5 pods in
 the namespace for team-a means that the namespace for org1 should not be able to
 claim 6 pods, etc. For example, use all the quota for one of the children:
 
+```
 $ kubectl -n c8364aeb843c485cab13a3ff77e3f4e5 get deployment
 NAME               READY   UP-TO-DATE   AVAILABLE   AGE
 nginx-deployment   5/5     5            5           63m
+```
 
 With normal quota management, the parent and siblings of the namespace would be
 independent of the resource usage of another namespace. With hierarchical quota
 management, even though the limit for the parent namespace is 10, if we try to
 use 6 resources that brings the total over the limit for the tree:
 
+```
 $ kubectl -n 511b180417954e29bb03212a177f58bd get deployment
 NAME               READY   UP-TO-DATE   AVAILABLE   AGE
 nginx-deployment   5/6     5            5           19s
+```
 
 Once we reduce the child to a lower usage...:
 
+```
 $ kubectl -n c8364aeb843c485cab13a3ff77e3f4e5 get deployment
 NAME               READY   UP-TO-DATE   AVAILABLE   AGE
 nginx-deployment   3/3     3            3           63m
+```
 
 ...then the parent can claim the rest of its requested resources:
 
+```
 $ kubectl -n 511b180417954e29bb03212a177f58bd get deployment
 NAME               READY   UP-TO-DATE   AVAILABLE   AGE
 nginx-deployment   6/6     6            6           62s
+```
