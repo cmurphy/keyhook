@@ -1,0 +1,4 @@
+*.pem
+kubeconfig.conf
+*.egg-info
+.tox
