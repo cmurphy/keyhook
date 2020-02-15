@@ -10,7 +10,11 @@ the number of pods that may be created.
 Usage
 -----
 
-Run keystone in devstack. Create a service and endpoint for kubernetes:
+Run keystone in devstack. In /etc/keystone/keystone.conf, create a new section
+`[unified_limit]` and add the config option `enforcement_model =
+strict_two_level` and restart keystone.
+
+Create a service and endpoint for kubernetes:
 
 ```
 $ openstack service create kubernetes --name kubernetes
