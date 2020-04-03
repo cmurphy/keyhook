@@ -25,10 +25,35 @@ class WebhookHandler(http.server.BaseHTTPRequestHandler):
         except kubernetes.client.rest.ApiException as e:
             self.send_error(500, "Could not get current pods: %s\n" % e)
             return
+        print("namespace %s has %d pods" % (namespace, len(pods.items)))
         return pods.items
 
+    def _get_project_or_domain(self, resource_id):
+        project = self.openstack_conn.get_project(resource_id)
+        if not project:
+            try:
+                project = self.openstack_conn.get_domain(resource_id)
+            except openstack.exceptions.ResourceNotFound:
+                self.send_error(
+                    500,
+                    "Could not find project or domain: %s\n" % resource_id)
+        return project
+
     def _usage_callback(self, project_id, resources_to_check):
-        return {'pods': len(self._get_kubernetes_data(project_id))}
+        namespace = self._get_project_or_domain(project_id)['name']
+        return {'pods': len(self._get_kubernetes_data(namespace))}
+
+    def _get_parent(self, namespace):
+        config = kubernetes.config.load_kube_config('kubeconfig.conf')
+        api = kubernetes.client.CustomObjectsApi(
+            kubernetes.client.ApiClient(config))
+        parent = api.list_namespaced_custom_object(
+            group="hnc.x-k8s.io",
+            version="v1alpha1",
+            namespace=namespace,
+            plural="hierarchyconfigurations"
+        )['items'][0]['spec'].get('parent')
+        return parent
 
     def do_POST(self):
         data = self.rfile.read(int(self.headers['Content-Length']))
@@ -65,12 +90,25 @@ class WebhookHandler(http.server.BaseHTTPRequestHandler):
 
         allowed = True
 
-        project = self.openstack_conn.get_project(namespace)
-        if project:
-            print("found matching project: %s" % project['id'])
+        domain = self._get_parent(namespace)
+        if domain:
+            try:
+                domain = self.openstack_conn.get_domain(
+                    name_or_id=domain)['id']
+            except openstack.exceptions.ResourceNotFound:
+                print("denying request: no matching domain for namespace "
+                      "parent")
+                allowed = False
+            project = self.openstack_conn.get_project(
+                namespace, domain_id=domain)
+            if project:
+                print("found matching project: %s" % project['id'])
+            else:
+                print("denying request: no matching project or domain")
+                allowed = False
         else:
             try:
-                project = self.openstack_conn.get_domain(namespace)
+                project = self.openstack_conn.get_domain(name_or_id=namespace)
                 print("found matching domain: %s" % project['id'])
             except openstack.exceptions.ResourceNotFound:
                 print("denying request: no matching project or domain")
